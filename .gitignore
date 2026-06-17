@@ -1,0 +1,52 @@
+# ── Secretos y credenciales ────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+credentials.json
+token.json
+*.pem
+*.key
+*.p12
+*.pfx
+service-account*.json
+google-credentials*.json
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+pip-log.txt
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Node.js (para la Parte 4) ─────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+package-lock.json
+
+# ── Logs y temporales ─────────────────────────────────────────────────────────
+*.log
+logs/
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# ── IDEs ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── UiPath ────────────────────────────────────────────────────────────────────
+*.nupkg
+.local/
+project.json.bak

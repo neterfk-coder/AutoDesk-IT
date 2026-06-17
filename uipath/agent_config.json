@@ -1,0 +1,51 @@
+{
+  "name": "IT Support Agent",
+  "description": "Agente de soporte IT multiplataforma con análisis IA y human-in-the-loop",
+  "version": "1.0.0",
+  "orchestrator": "maestro",
+  "triggers": [
+    {
+      "type": "webhook",
+      "name": "ServiceNow ticket created",
+      "endpoint": "/webhook/servicenow",
+      "method": "POST"
+    },
+    {
+      "type": "webhook",
+      "name": "Gmail email received",
+      "endpoint": "/webhook/gmail",
+      "method": "POST"
+    }
+  ],
+  "agents": [
+    {
+      "id": "groq-analyzer",
+      "name": "Groq Analysis Agent",
+      "type": "external_llm",
+      "model": "llama-3.3-70b-versatile",
+      "provider": "groq",
+      "role": "Analiza tickets IT y genera fix scripts automáticamente"
+    },
+    {
+      "id": "uipath-orchestrator",
+      "name": "UiPath Maestro Orchestrator",
+      "type": "uipath_maestro",
+      "role": "Orquesta el flujo completo y gestiona human-in-the-loop"
+    },
+    {
+      "id": "notification-agent",
+      "name": "Notification Agent",
+      "type": "api_workflow",
+      "platforms": ["slack", "jira"],
+      "role": "Envía notificaciones y crea issues en plataformas externas"
+    }
+  ],
+  "human_in_the_loop": {
+    "enabled": true,
+    "trigger": "escalate == true",
+    "channel": "slack",
+    "timeout_minutes": 60,
+    "actions": ["approve", "reject"]
+  },
+  "integrations": ["servicenow", "gmail", "slack", "jira", "supabase", "groq"]
+}

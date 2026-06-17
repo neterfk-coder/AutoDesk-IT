@@ -1,0 +1,99 @@
+{
+  "name": "IT Support API Workflow",
+  "version": "1.0.0",
+  "description": "API Workflow de UiPath Maestro que orquesta el agente de soporte IT",
+  "trigger": {
+    "type": "http",
+    "method": "POST",
+    "path": "/it-support/process",
+    "authentication": "bearer_token"
+  },
+  "steps": [
+    {
+      "id": "step-1",
+      "name": "Receive ticket",
+      "type": "input_validation",
+      "required_fields": ["id", "source", "title", "description"],
+      "on_failure": "return_400"
+    },
+    {
+      "id": "step-2",
+      "name": "Save to Supabase",
+      "type": "http_request",
+      "url": "${WEBHOOK_SERVER_URL}/internal/save-ticket",
+      "method": "POST",
+      "body": "${input}",
+      "on_failure": "log_and_continue"
+    },
+    {
+      "id": "step-3",
+      "name": "Analyze with Groq agent",
+      "type": "invoke_agent",
+      "agent_id": "groq-analyzer",
+      "input": "${step-1.output}",
+      "timeout_seconds": 30,
+      "on_failure": "escalate"
+    },
+    {
+      "id": "step-4",
+      "name": "Evaluate escalation",
+      "type": "condition",
+      "condition": "${step-3.output.escalate} == true",
+      "if_true": "step-5-escalate",
+      "if_false": "step-5-autofix"
+    },
+    {
+      "id": "step-5-escalate",
+      "name": "Human approval (human-in-the-loop)",
+      "type": "human_task",
+      "channel": "slack",
+      "message": "Ticket crítico requiere aprobación: ${step-1.output.title}",
+      "actions": ["approve", "reject"],
+      "timeout_minutes": 60,
+      "on_timeout": "auto_escalate"
+    },
+    {
+      "id": "step-5-autofix",
+      "name": "Auto-fix and notify",
+      "type": "http_request",
+      "url": "${WEBHOOK_SERVER_URL}/internal/auto-fix",
+      "method": "POST",
+      "body": {
+        "ticket": "${step-1.output}",
+        "analysis": "${step-3.output}"
+      }
+    },
+    {
+      "id": "step-6",
+      "name": "Notify Slack",
+      "type": "invoke_agent",
+      "agent_id": "notification-agent",
+      "input": {
+        "ticket": "${step-1.output}",
+        "analysis": "${step-3.output}",
+        "platform": "slack"
+      }
+    },
+    {
+      "id": "step-7",
+      "name": "Create Jira issue if escalated",
+      "type": "condition",
+      "condition": "${step-3.output.escalate} == true",
+      "if_true": {
+        "type": "invoke_agent",
+        "agent_id": "notification-agent",
+        "input": {
+          "ticket": "${step-1.output}",
+          "analysis": "${step-3.output}",
+          "platform": "jira"
+        }
+      },
+      "if_false": "end"
+    }
+  ],
+  "output": {
+    "ticket_id": "${step-1.output.id}",
+    "status": "${step-4.result}",
+    "analysis": "${step-3.output}"
+  }
+}

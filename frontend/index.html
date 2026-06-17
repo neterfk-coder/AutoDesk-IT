@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IT Support Agent — Dashboard</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <div class="header-inner">
+        <div class="logo">
+          <span class="logo-dot"></span>
+          IT Support Agent
+        </div>
+        <div class="stats" id="stats">
+          <div class="stat">
+            <span id="count-received">0</span><label>Recibidos</label>
+          </div>
+          <div class="stat">
+            <span id="count-processing">0</span><label>Procesando</label>
+          </div>
+          <div class="stat">
+            <span id="count-resolved">0</span><label>Resueltos</label>
+          </div>
+          <div class="stat">
+            <span id="count-escalated">0</span><label>Escalados</label>
+          </div>
+        </div>
+        <div class="live-badge"><span class="pulse"></span> EN VIVO</div>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>Tickets en tiempo real</h2>
+        <div class="filters">
+          <button class="filter-btn active" data-filter="all">Todos</button>
+          <button class="filter-btn" data-filter="received">Recibidos</button>
+          <button class="filter-btn" data-filter="processing">
+            Procesando
+          </button>
+          <button class="filter-btn" data-filter="resolved">Resueltos</button>
+          <button class="filter-btn" data-filter="escalated">Escalados</button>
+        </div>
+        <div id="tickets-list">
+          <div class="empty-state">Esperando tickets...</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Detalle del ticket</h2>
+        <div id="ticket-detail">
+          <div class="empty-state">
+            Selecciona un ticket para ver el análisis
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
