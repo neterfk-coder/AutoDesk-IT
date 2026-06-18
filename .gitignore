@@ -10,6 +10,11 @@ token.json
 *.pfx
 service-account*.json
 google-credentials*.json
+serviceAccountKey.json
+
+# ── Frontend secrets ───────────────────────────────────────────────────────────
+frontend/config.js
+!frontend/config.example.js
 
 # ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/
@@ -26,7 +31,7 @@ dist/
 build/
 .eggs/
 
-# ── Node.js (para la Parte 4) ─────────────────────────────────────────────────
+# ── Node.js ───────────────────────────────────────────────────────────────────
 node_modules/
 npm-debug.log*
 yarn-error.log*
@@ -39,14 +44,22 @@ logs/
 *.temp
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # ── IDEs ──────────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
 
 # ── UiPath ────────────────────────────────────────────────────────────────────
 *.nupkg
 .local/
 project.json.bak
+
+# ── Tests y coverage ──────────────────────────────────────────────────────────
+.coverage
+htmlcov/
+.pytest_cache/
