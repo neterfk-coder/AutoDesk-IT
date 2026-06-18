@@ -1,1 +1,1 @@
-from .webhook_server import app
+# server/__init__.py
