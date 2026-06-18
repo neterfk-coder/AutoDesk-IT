@@ -1,10 +1,5 @@
-// ── Configuración Supabase ─────────────────────────────────────────────────────
-// Reemplaza con tus valores reales del .env
-const SUPABASE_URL = "https://xxxxxxxxxxx.supabase.co";
-const SUPABASE_ANON = "eyJhbGc...";
-
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+// ── Configuración Firebase Realtime Database ──────────────────────────────────
+const FIREBASE_URL = "https://autodesk-it-default-rtdb.firebaseio.com";
 
 // ── Estado local ──────────────────────────────────────────────────────────────
 let tickets = [];
@@ -12,93 +7,60 @@ let activeFilter = "all";
 let activeTicket = null;
 
 // ── Inicio ────────────────────────────────────────────────────────────────────
-document.addEventListener("DOMContentLoaded", async () => {
-  await loadTickets();
+document.addEventListener("DOMContentLoaded", () => {
   subscribeRealtime();
   setupFilters();
 });
 
-// ── Cargar tickets iniciales ──────────────────────────────────────────────────
-async function loadTickets() {
-  const { data, error } = await sb
-    .from("tickets")
-    .select(`*, analyses(*)`)
-    .order("created_at", { ascending: false })
-    .limit(50);
+// ── Realtime: escucha cambios en Firebase ─────────────────────────────────────
+function subscribeRealtime() {
+  // Escuchar tickets en tiempo real con SSE
+  const ticketsUrl = `${FIREBASE_URL}/tickets.json`;
 
-  if (error) {
-    console.error("Error cargando tickets:", error);
-    return;
-  }
-  tickets = data || [];
-  renderTickets();
-  updateStats();
+  // Carga inicial
+  loadAllTickets();
+
+  // Polling cada 3 segundos para tiempo real
+  // (Firebase Realtime Database REST no soporta SSE en modo prueba sin auth)
+  setInterval(loadAllTickets, 3000);
 }
 
-// ── Realtime: escucha cambios en Supabase ─────────────────────────────────────
-function subscribeRealtime() {
-  sb.channel("tickets-channel")
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "tickets",
-      },
-      async (payload) => {
-        if (payload.eventType === "INSERT") {
-          // Carga el ticket completo con análisis
-          const { data } = await sb
-            .from("tickets")
-            .select(`*, analyses(*)`)
-            .eq("id", payload.new.id)
-            .single();
+async function loadAllTickets() {
+  try {
+    const [ticketsResp, analysesResp] = await Promise.all([
+      fetch(`${FIREBASE_URL}/tickets.json`),
+      fetch(`${FIREBASE_URL}/analyses.json`),
+    ]);
 
-          if (data) {
-            tickets.unshift(data);
-            showToast(`Nuevo ticket: ${data.title}`);
-          }
-        }
+    const ticketsData = (await ticketsResp.json()) || {};
+    const analysesData = (await analysesResp.json()) || {};
 
-        if (payload.eventType === "UPDATE") {
-          const idx = tickets.findIndex((t) => t.id === payload.new.id);
-          if (idx !== -1) {
-            tickets[idx] = { ...tickets[idx], ...payload.new };
-            if (activeTicket?.id === payload.new.id) {
-              renderDetail(tickets[idx]);
-            }
-          }
-        }
+    const prevCount = tickets.length;
 
-        renderTickets();
-        updateStats();
-      },
-    )
-    .subscribe();
+    // Combinar tickets con sus análisis
+    tickets = Object.values(ticketsData)
+      .map((t) => ({
+        ...t,
+        analyses: analysesData[t.id] ? [analysesData[t.id]] : [],
+      }))
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-  // También escucha análisis nuevos
-  sb.channel("analyses-channel")
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "analyses",
-      },
-      async (payload) => {
-        const ticketIdx = tickets.findIndex(
-          (t) => t.id === payload.new.ticket_id,
-        );
-        if (ticketIdx !== -1) {
-          if (!tickets[ticketIdx].analyses) tickets[ticketIdx].analyses = [];
-          tickets[ticketIdx].analyses.push(payload.new);
-          if (activeTicket?.id === payload.new.ticket_id) {
-            renderDetail(tickets[ticketIdx]);
-          }
-        }
-      },
-    )
-    .subscribe();
+    // Mostrar toast si llegó ticket nuevo
+    if (prevCount > 0 && tickets.length > prevCount) {
+      showToast(`Nuevo ticket: ${tickets[0].title}`);
+    }
+
+    renderTickets();
+    updateStats();
+
+    // Actualizar detalle si hay uno activo
+    if (activeTicket) {
+      const updated = tickets.find((t) => t.id === activeTicket.id);
+      if (updated) renderDetail(updated);
+    }
+  } catch (e) {
+    console.error("Error cargando tickets:", e);
+  }
 }
 
 // ── Renderizar lista de tickets ───────────────────────────────────────────────
@@ -154,7 +116,7 @@ function renderDetail(ticket) {
         ${escapeHtml(ticket.title)}
       </div>
       <div style="color:#64748b;font-size:12px;margin-top:4px">
-        ${ticket.id} · ${ticket.source} · ${ticket.user_email}
+        ${ticket.id} · ${ticket.source} · ${ticket.user_email || "—"}
       </div>
     </div>
 
@@ -170,12 +132,14 @@ function renderDetail(ticket) {
         <div class="detail-label">Análisis IA</div>
         <div class="detail-value">
           <strong>${escapeHtml(analysis.summary)}</strong><br>
-          <span style="color:#64748b">Causa raíz: ${escapeHtml(analysis.root_cause || "—")}</span>
+          <span style="color:#64748b">
+            Causa raíz: ${escapeHtml(analysis.root_cause || "—")}
+          </span>
         </div>
       </div>
 
       <div class="detail-section">
-        <div class="detail-label">Categoría / Severidad</div>
+        <div class="detail-label">Categoría / Severidad / Tiempo</div>
         <div class="actions-row">
           <span class="action-chip">${analysis.category}</span>
           <span class="action-chip">${analysis.severity}</span>
@@ -187,17 +151,20 @@ function renderDetail(ticket) {
         analysis.fix_script
           ? `
         <div class="detail-section">
-          <div class="detail-label">Fix Script</div>
+          <div class="detail-label">Fix Script generado por IA</div>
           <div class="fix-script">${escapeHtml(analysis.fix_script)}</div>
-          <button class="copy-btn" onclick="copyScript(\`${escapeHtml(analysis.fix_script)}\`)">
+          <button class="copy-btn"
+            onclick="copyScript(\`${escapeHtml(analysis.fix_script)}\`)">
             Copiar script
           </button>
         </div>
       `
           : `
         <div class="detail-section">
-          <div class="detail-label">Instrucciones manuales</div>
-          <div class="detail-value">${escapeHtml(analysis.fix_instructions || "—")}</div>
+          <div class="detail-label">Instrucciones</div>
+          <div class="detail-value">
+            ${escapeHtml(analysis.fix_instructions || "—")}
+          </div>
         </div>
       `
       }
@@ -206,14 +173,17 @@ function renderDetail(ticket) {
         analysis.escalate
           ? `
         <div class="escalate-alert">
-          ⚠️ <span><strong>Requiere escalación:</strong> ${escapeHtml(analysis.escalate_reason || "")}</span>
+          ⚠️ <span>
+            <strong>Requiere escalación:</strong>
+            ${escapeHtml(analysis.escalate_reason || "")}
+          </span>
         </div>
       `
           : ""
       }
     `
         : `
-      <div class="empty-state">Analizando ticket...</div>
+      <div class="empty-state">⏳ Analizando ticket con IA...</div>
     `
     }
   `;
@@ -221,7 +191,7 @@ function renderDetail(ticket) {
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 function updateStats() {
-  const count = (status) => tickets.filter((t) => t.status === status).length;
+  const count = (s) => tickets.filter((t) => t.status === s).length;
   document.getElementById("count-received").textContent = count("received");
   document.getElementById("count-processing").textContent = count("processing");
   document.getElementById("count-resolved").textContent = count("resolved");
@@ -261,7 +231,9 @@ function sourceIcon(s) {
 function severityDot(ticket) {
   const sev = ticket.analyses?.[0]?.severity;
   if (!sev) return "";
-  return `<span><span class="severity-dot sev-${sev}"></span>${sev}</span>`;
+  return `<span>
+    <span class="severity-dot sev-${sev}"></span>${sev}
+  </span>`;
 }
 
 function timeAgo(dateStr) {
@@ -282,7 +254,7 @@ function escapeHtml(str) {
 
 function copyScript(text) {
   navigator.clipboard.writeText(text);
-  showToast("Script copiado al portapapeles");
+  showToast("Script copiado al portapapeles ✓");
 }
 
 function showToast(msg) {
