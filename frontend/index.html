@@ -293,3 +293,56 @@
     <script src="app.js"></script>
   </body>
 </html>
+<!-- ── Analytics Row ── -->
+<div class="analytics-row">
+  <!-- Heatmap -->
+  <section class="analytics-panel">
+    <div class="panel-header">
+      <span class="panel-title">Ticket Heatmap — Last 7 Days</span>
+      <span class="activity-count" id="heatmap-total">0 tickets</span>
+    </div>
+    <div class="heatmap-wrap">
+      <div class="heatmap-hours">
+        <span></span>
+        <span>6am</span><span>9am</span><span>12pm</span> <span>3pm</span
+        ><span>6pm</span><span>9pm</span>
+      </div>
+      <div class="heatmap-grid" id="heatmap-grid"></div>
+      <div class="heatmap-legend">
+        <span style="color: var(--text3); font-size: 10px">Low</span>
+        <div class="legend-scale">
+          <div class="legend-cell" style="background: #0f1623"></div>
+          <div class="legend-cell" style="background: #1e3a5f"></div>
+          <div class="legend-cell" style="background: #1d4ed8"></div>
+          <div class="legend-cell" style="background: #3b82f6"></div>
+          <div class="legend-cell" style="background: #93c5fd"></div>
+        </div>
+        <span style="color: var(--text3); font-size: 10px">High</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Timeline -->
+  <section class="analytics-panel">
+    <div class="panel-header">
+      <span class="panel-title">Ticket Lifecycle Timeline</span>
+      <span class="activity-count" id="timeline-count">Select a ticket</span>
+    </div>
+    <div id="timeline-wrap">
+      <div class="empty-state small">
+        <svg
+          width="28"
+          height="28"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+        <p>Select a ticket to see its lifecycle</p>
+      </div>
+    </div>
+  </section>
+</div>
