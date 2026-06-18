@@ -1,43 +1,32 @@
-// ── Configuración Firebase Realtime Database ──────────────────────────────────
+// ── Config ────────────────────────────────────────────────────────────────────
 const FIREBASE_URL = "https://autodesk-it-default-rtdb.firebaseio.com";
 
-// ── Estado local ──────────────────────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────────────────────
 let tickets = [];
+let filtered = [];
 let activeFilter = "all";
 let activeTicket = null;
+let searchQuery = "";
+let activityLog = [];
+let pollInterval = null;
 
-// ── Inicio ────────────────────────────────────────────────────────────────────
+// ── Boot ──────────────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
-  subscribeRealtime();
-  setupFilters();
+  loadAllTickets();
+  pollInterval = setInterval(loadAllTickets, 3000);
 });
 
-// ── Realtime: escucha cambios en Firebase ─────────────────────────────────────
-function subscribeRealtime() {
-  // Escuchar tickets en tiempo real con SSE
-  const ticketsUrl = `${FIREBASE_URL}/tickets.json`;
-
-  // Carga inicial
-  loadAllTickets();
-
-  // Polling cada 3 segundos para tiempo real
-  // (Firebase Realtime Database REST no soporta SSE en modo prueba sin auth)
-  setInterval(loadAllTickets, 3000);
-}
-
+// ── Load data ─────────────────────────────────────────────────────────────────
 async function loadAllTickets() {
   try {
-    const [ticketsResp, analysesResp] = await Promise.all([
+    const [tr, ar] = await Promise.all([
       fetch(`${FIREBASE_URL}/tickets.json`),
       fetch(`${FIREBASE_URL}/analyses.json`),
     ]);
-
-    const ticketsData = (await ticketsResp.json()) || {};
-    const analysesData = (await analysesResp.json()) || {};
-
+    const ticketsData = (await tr.json()) || {};
+    const analysesData = (await ar.json()) || {};
     const prevCount = tickets.length;
 
-    // Combinar tickets con sus análisis
     tickets = Object.values(ticketsData)
       .map((t) => ({
         ...t,
@@ -45,50 +34,300 @@ async function loadAllTickets() {
       }))
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-    // Mostrar toast si llegó ticket nuevo
     if (prevCount > 0 && tickets.length > prevCount) {
-      showToast(`Nuevo ticket: ${tickets[0].title}`);
+      const newest = tickets[0];
+      showToast(`🎫 New ticket: ${newest.title}`);
+      addActivity(
+        "blue",
+        `New ticket received from ${newest.source}`,
+        newest.title,
+      );
     }
 
-    renderTickets();
+    applyFilters();
     updateStats();
+    updateNavBadges();
 
-    // Actualizar detalle si hay uno activo
     if (activeTicket) {
       const updated = tickets.find((t) => t.id === activeTicket.id);
-      if (updated) renderDetail(updated);
+      if (updated && JSON.stringify(updated) !== JSON.stringify(activeTicket)) {
+        activeTicket = updated;
+        renderDetail(updated);
+      }
     }
   } catch (e) {
-    console.error("Error cargando tickets:", e);
+    console.error("Firebase error:", e);
   }
 }
 
-// ── Renderizar lista de tickets ───────────────────────────────────────────────
+// ── Filters ───────────────────────────────────────────────────────────────────
+function setFilter(filter, el) {
+  activeFilter = filter;
+  document
+    .querySelectorAll(".nav-item")
+    .forEach((i) => i.classList.remove("active"));
+  if (el) el.classList.add("active");
+  applyFilters();
+}
+
+function filterBySearch(val) {
+  searchQuery = val.toLowerCase();
+  applyFilters();
+}
+
+function applyFilters() {
+  filtered = tickets.filter((t) => {
+    const matchFilter =
+      activeFilter === "all"
+        ? true
+        : activeFilter === "servicenow" || activeFilter === "gmail"
+          ? t.source === activeFilter
+          : t.status === activeFilter;
+
+    const matchSearch = !searchQuery
+      ? true
+      : t.title.toLowerCase().includes(searchQuery) ||
+        t.description?.toLowerCase().includes(searchQuery) ||
+        t.user_email?.toLowerCase().includes(searchQuery);
+
+    return matchFilter && matchSearch;
+  });
+  renderTickets();
+}
+
+// ── Render tickets ────────────────────────────────────────────────────────────
 function renderTickets() {
   const list = document.getElementById("tickets-list");
-  const filtered =
-    activeFilter === "all"
-      ? tickets
-      : tickets.filter((t) => t.status === activeFilter);
 
   if (filtered.length === 0) {
-    list.innerHTML = '<div class="empty-state">Sin tickets para mostrar</div>';
+    list.innerHTML = `
+      <div class="empty-state">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <p>${tickets.length === 0 ? "No tickets yet" : "No tickets match your filter"}</p>
+      </div>`;
     return;
   }
 
   list.innerHTML = filtered
-    .map(
-      (t) => `
+    .map((t) => {
+      const sev = t.analyses?.[0]?.severity || null;
+      return `
     <div class="ticket-card ${activeTicket?.id === t.id ? "active" : ""}"
          onclick="selectTicket('${t.id}')">
-      <div class="ticket-card-header">
-        <span class="ticket-title">${escapeHtml(t.title)}</span>
-        <span class="badge badge-${t.status}">${statusLabel(t.status)}</span>
+      <div class="ticket-card-top">
+        <span class="ticket-card-title">${escHtml(t.title)}</span>
+        <span class="status-badge status-${t.status}">${statusLabel(t.status)}</span>
       </div>
-      <div class="ticket-meta">
+      <div class="ticket-card-meta">
         <span>${sourceIcon(t.source)} ${t.source}</span>
-        ${severityDot(t)}
-        <span>${timeAgo(t.created_at)}</span>
+        ${sev ? `<span class="sev-pill sev-${sev}">${sev}</span>` : ""}
+        <span style="margin-left:auto">${timeAgo(t.created_at)}</span>
+      </div>
+    </div>`;
+    })
+    .join("");
+}
+
+// ── Select ticket ─────────────────────────────────────────────────────────────
+function selectTicket(id) {
+  activeTicket = tickets.find((t) => t.id === id);
+  renderTickets();
+  renderDetail(activeTicket);
+}
+
+// ── Render detail ─────────────────────────────────────────────────────────────
+function renderDetail(ticket) {
+  if (!ticket) return;
+  const a = ticket.analyses?.[0];
+  const div = document.getElementById("ticket-detail");
+
+  div.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-title">${escHtml(ticket.title)}</div>
+      <div class="detail-meta-row">
+        <span class="meta-tag">${ticket.id}</span>
+        <span class="meta-tag">${ticket.source}</span>
+        <span class="meta-tag">${ticket.user_email || "—"}</span>
+        <span class="status-badge status-${ticket.status}">${statusLabel(ticket.status)}</span>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="section-label">Description</div>
+      <div class="section-value">${escHtml(ticket.description || "—")}</div>
+    </div>
+
+    ${
+      a
+        ? `
+      <div class="detail-section">
+        <div class="section-label">AI Analysis</div>
+        <div class="ai-summary">
+          <div class="ai-summary-title">${escHtml(a.summary)}</div>
+          <div class="ai-summary-sub">Root cause: ${escHtml(a.root_cause || "—")}</div>
+        </div>
+      </div>
+
+      <div class="detail-section">
+        <div class="section-label">Classification</div>
+        <div class="chips-row">
+          <span class="chip">📁 ${a.category}</span>
+          <span class="chip sev-${a.severity}">${a.severity}</span>
+          <span class="chip">⏱ ~${a.estimated_time_minutes} min</span>
+          <span class="chip">${a.escalate ? "⚠️ Escalate" : "✅ Auto-fix"}</span>
+        </div>
+      </div>
+
+      ${
+        a.fix_script
+          ? `
+        <div class="detail-section">
+          <div class="section-label">Fix Script</div>
+          <div class="fix-script-box">
+            <div class="fix-script-header">
+              <span class="fix-script-label">bash / powershell</span>
+              <button class="copy-btn" onclick="copyScript(\`${escHtml(a.fix_script)}\`)">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                </svg>
+                Copy
+              </button>
+            </div>
+            <div class="fix-script-code">${escHtml(a.fix_script)}</div>
+          </div>
+        </div>
+      `
+          : `
+        <div class="detail-section">
+          <div class="section-label">Instructions</div>
+          <div class="section-value">${escHtml(a.fix_instructions || "—")}</div>
+        </div>
+      `
+      }
+
+      ${
+        a.escalate
+          ? `
+        <div class="detail-section">
+          <div class="escalation-box">
+            <div class="escalation-icon">⚠️</div>
+            <div>
+              <div class="escalation-title">Human Approval Required</div>
+              <div class="escalation-reason">${escHtml(a.escalate_reason || "")}</div>
+              <div class="approval-btns">
+                <button class="btn-approve" onclick="handleApproval('${ticket.id}', 'approve')">
+                  ✓ Approve Fix
+                </button>
+                <button class="btn-reject" onclick="handleApproval('${ticket.id}', 'reject')">
+                  ✕ Reject
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `
+          : ""
+      }
+    `
+        : `
+      <div class="detail-section">
+        <div class="empty-state">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+          </svg>
+          <p>AI analysis in progress...</p>
+        </div>
+      </div>
+    `
+    }
+  `;
+}
+
+// ── Human in the loop ─────────────────────────────────────────────────────────
+async function handleApproval(ticketId, action) {
+  const color = action === "approve" ? "green" : "red";
+  const label = action === "approve" ? "approved" : "rejected";
+  addActivity(color, `Fix ${label} by human reviewer`, `Ticket ${ticketId}`);
+  showToast(
+    action === "approve"
+      ? "✅ Fix approved — executing..."
+      : "❌ Fix rejected — escalating...",
+  );
+
+  try {
+    await fetch(`${FIREBASE_URL}/tickets/${ticketId}.json`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: action === "approve" ? "resolved" : "escalated",
+        updated_at: new Date().toISOString(),
+      }),
+    });
+    await loadAllTickets();
+  } catch (e) {
+    console.error("Approval error:", e);
+  }
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+function updateStats() {
+  const total = tickets.length;
+  const resolved = tickets.filter((t) => t.status === "resolved").length;
+  const rate = total > 0 ? Math.round((resolved / total) * 100) : 0;
+  const times = tickets
+    .filter((t) => t.analyses?.[0]?.estimated_time_minutes)
+    .map((t) => t.analyses[0].estimated_time_minutes);
+  const avg =
+    times.length > 0
+      ? Math.round(times.reduce((a, b) => a + b, 0) / times.length)
+      : 0;
+
+  document.getElementById("metric-total").textContent = total;
+  document.getElementById("metric-rate").textContent = rate + "%";
+  document.getElementById("metric-avg").textContent = avg + "m";
+}
+
+function updateNavBadges() {
+  const count = (s) =>
+    tickets.filter((t) => (s === "all" ? true : t.status === s)).length;
+
+  document.getElementById("nav-all").textContent = tickets.length;
+  document.getElementById("nav-received").textContent = count("received");
+  document.getElementById("nav-processing").textContent = count("processing");
+  document.getElementById("nav-resolved").textContent = count("resolved");
+  document.getElementById("nav-escalated").textContent = count("escalated");
+}
+
+// ── Activity feed ─────────────────────────────────────────────────────────────
+function addActivity(color, text, sub) {
+  activityLog.unshift({ color, text, sub, time: new Date() });
+  if (activityLog.length > 50) activityLog.pop();
+  renderActivity();
+
+  const countEl = document.getElementById("activity-count");
+  if (countEl) countEl.textContent = `${activityLog.length} events`;
+}
+
+function renderActivity() {
+  const feed = document.getElementById("activity-feed");
+  if (!feed) return;
+
+  if (activityLog.length === 0) {
+    feed.innerHTML = '<div class="empty-state small">No activity yet</div>';
+    return;
+  }
+
+  feed.innerHTML = activityLog
+    .map(
+      (a) => `
+    <div class="activity-item">
+      <div class="activity-dot ${a.color}"></div>
+      <div class="activity-body">
+        <div class="activity-text">${escHtml(a.text)}</div>
+        ${a.sub ? `<div class="activity-time">${escHtml(a.sub)}</div>` : ""}
+        <div class="activity-time">${timeAgo(a.time)}</div>
       </div>
     </div>
   `,
@@ -96,130 +335,14 @@ function renderTickets() {
     .join("");
 }
 
-// ── Seleccionar ticket ────────────────────────────────────────────────────────
-function selectTicket(id) {
-  activeTicket = tickets.find((t) => t.id === id);
-  renderTickets();
-  renderDetail(activeTicket);
-}
-
-// ── Renderizar detalle ────────────────────────────────────────────────────────
-function renderDetail(ticket) {
-  if (!ticket) return;
-  const analysis = ticket.analyses?.[0];
-  const detail = document.getElementById("ticket-detail");
-
-  detail.innerHTML = `
-    <div class="detail-section">
-      <div class="detail-label">Ticket</div>
-      <div class="detail-value" style="font-size:15px;font-weight:600">
-        ${escapeHtml(ticket.title)}
-      </div>
-      <div style="color:#64748b;font-size:12px;margin-top:4px">
-        ${ticket.id} · ${ticket.source} · ${ticket.user_email || "—"}
-      </div>
-    </div>
-
-    <div class="detail-section">
-      <div class="detail-label">Descripción</div>
-      <div class="detail-value">${escapeHtml(ticket.description || "—")}</div>
-    </div>
-
-    ${
-      analysis
-        ? `
-      <div class="detail-section">
-        <div class="detail-label">Análisis IA</div>
-        <div class="detail-value">
-          <strong>${escapeHtml(analysis.summary)}</strong><br>
-          <span style="color:#64748b">
-            Causa raíz: ${escapeHtml(analysis.root_cause || "—")}
-          </span>
-        </div>
-      </div>
-
-      <div class="detail-section">
-        <div class="detail-label">Categoría / Severidad / Tiempo</div>
-        <div class="actions-row">
-          <span class="action-chip">${analysis.category}</span>
-          <span class="action-chip">${analysis.severity}</span>
-          <span class="action-chip">~${analysis.estimated_time_minutes} min</span>
-        </div>
-      </div>
-
-      ${
-        analysis.fix_script
-          ? `
-        <div class="detail-section">
-          <div class="detail-label">Fix Script generado por IA</div>
-          <div class="fix-script">${escapeHtml(analysis.fix_script)}</div>
-          <button class="copy-btn"
-            onclick="copyScript(\`${escapeHtml(analysis.fix_script)}\`)">
-            Copiar script
-          </button>
-        </div>
-      `
-          : `
-        <div class="detail-section">
-          <div class="detail-label">Instrucciones</div>
-          <div class="detail-value">
-            ${escapeHtml(analysis.fix_instructions || "—")}
-          </div>
-        </div>
-      `
-      }
-
-      ${
-        analysis.escalate
-          ? `
-        <div class="escalate-alert">
-          ⚠️ <span>
-            <strong>Requiere escalación:</strong>
-            ${escapeHtml(analysis.escalate_reason || "")}
-          </span>
-        </div>
-      `
-          : ""
-      }
-    `
-        : `
-      <div class="empty-state">⏳ Analizando ticket con IA...</div>
-    `
-    }
-  `;
-}
-
-// ── Stats ─────────────────────────────────────────────────────────────────────
-function updateStats() {
-  const count = (s) => tickets.filter((t) => t.status === s).length;
-  document.getElementById("count-received").textContent = count("received");
-  document.getElementById("count-processing").textContent = count("processing");
-  document.getElementById("count-resolved").textContent = count("resolved");
-  document.getElementById("count-escalated").textContent = count("escalated");
-}
-
-// ── Filtros ───────────────────────────────────────────────────────────────────
-function setupFilters() {
-  document.querySelectorAll(".filter-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document
-        .querySelectorAll(".filter-btn")
-        .forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      activeFilter = btn.dataset.filter;
-      renderTickets();
-    });
-  });
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function statusLabel(s) {
   return (
     {
-      received: "Recibido",
-      processing: "Procesando",
-      resolved: "Resuelto",
-      escalated: "Escalado",
+      received: "Received",
+      processing: "Processing",
+      resolved: "Resolved",
+      escalated: "Escalated",
     }[s] || s
   );
 }
@@ -228,24 +351,17 @@ function sourceIcon(s) {
   return { servicenow: "🎫", gmail: "📧", manual: "✏️" }[s] || "📋";
 }
 
-function severityDot(ticket) {
-  const sev = ticket.analyses?.[0]?.severity;
-  if (!sev) return "";
-  return `<span>
-    <span class="severity-dot sev-${sev}"></span>${sev}
-  </span>`;
+function timeAgo(d) {
+  const diff = Math.floor((Date.now() - new Date(d)) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 }
 
-function timeAgo(dateStr) {
-  const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
-  if (diff < 60) return `${diff}s`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-  return `${Math.floor(diff / 3600)}h`;
-}
-
-function escapeHtml(str) {
-  if (!str) return "";
-  return String(str)
+function escHtml(s) {
+  if (!s) return "";
+  return String(s)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -254,7 +370,8 @@ function escapeHtml(str) {
 
 function copyScript(text) {
   navigator.clipboard.writeText(text);
-  showToast("Script copiado al portapapeles ✓");
+  showToast("📋 Script copied to clipboard");
+  addActivity("blue", "Fix script copied", "Ready to execute");
 }
 
 function showToast(msg) {
