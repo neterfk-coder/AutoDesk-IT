@@ -158,3 +158,76 @@ function getFriendlyError(code) {
   };
   return errors[code] || "Something went wrong. Please try again.";
 }
+// ── Guest access ──────────────────────────────────────────────────────────────
+function continueAsGuest() {
+  // Mostrar dashboard directamente sin autenticación
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("app-wrapper").style.display = "flex";
+
+  // Configurar como guest
+  const nameEl = document.getElementById("user-name");
+  const emailEl = document.getElementById("user-email");
+  const photoEl = document.getElementById("user-photo");
+
+  if (nameEl) nameEl.textContent = "Guest User";
+  if (emailEl) emailEl.textContent = "guest · view only";
+  if (photoEl) {
+    photoEl.style.display = "none";
+  }
+
+  // Reemplazar botón de logout por "Sign In"
+  const logoutBtn = document.querySelector(".logout-btn");
+  if (logoutBtn) {
+    logoutBtn.title = "Sign in";
+    logoutBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/>
+        <polyline points="10 17 15 12 10 7"/>
+        <line x1="15" y1="12" x2="3" y2="12"/>
+      </svg>`;
+    logoutBtn.onclick = () => {
+      document.getElementById("app-wrapper").style.display = "none";
+      document.getElementById("login-screen").style.display = "flex";
+    };
+  }
+
+  // Mostrar banner de guest en el dashboard
+  showGuestBanner();
+}
+
+function showGuestBanner() {
+  const banner = document.createElement("div");
+  banner.id = "guest-banner";
+  banner.style.cssText = `
+    position: fixed;
+    top: 0; left: var(--sidebar-w); right: 0;
+    background: linear-gradient(90deg, rgba(124,58,237,0.15), rgba(59,130,246,0.15));
+    border-bottom: 1px solid rgba(124,58,237,0.3);
+    padding: 8px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 200;
+    font-size: 12px;
+    color: var(--purple-lt);
+  `;
+  banner.innerHTML = `
+    <span>
+      👤 You're browsing as a <strong>Guest</strong> —
+      data is read-only. Sign in to manage tickets.
+    </span>
+    <button onclick="document.getElementById('app-wrapper').style.display='none';
+      document.getElementById('login-screen').style.display='flex';
+      document.getElementById('guest-banner').remove()"
+      style="background:var(--purple);color:white;border:none;
+        border-radius:6px;padding:4px 12px;font-size:11px;
+        cursor:pointer;font-family:var(--font);font-weight:600">
+      Sign In
+    </button>
+  `;
+  document.body.appendChild(banner);
+
+  // Ajustar topbar para dar espacio al banner
+  const topbar = document.querySelector(".topbar");
+  if (topbar) topbar.style.marginTop = "37px";
+}
