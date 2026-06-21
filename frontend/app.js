@@ -728,3 +728,165 @@ function showToast(msg) {
   t.classList.remove("hidden");
   setTimeout(() => t.classList.add("hidden"), 3000);
 }
+// ── New Ticket Modal ──────────────────────────────────────────────────────────
+function openNewTicket() {
+  document.getElementById("modal-overlay").classList.remove("hidden");
+  document.getElementById("modal-ticket").classList.remove("hidden");
+  setTimeout(() => document.getElementById("nt-title")?.focus(), 100);
+}
+
+function closeNewTicket() {
+  document.getElementById("modal-overlay").classList.add("hidden");
+  document.getElementById("modal-ticket").classList.add("hidden");
+  // Reset form
+  document.getElementById("nt-title").value = "";
+  document.getElementById("nt-desc").value = "";
+  document.getElementById("nt-email").value = "";
+  document.getElementById("nt-priority").value = "3";
+  document.getElementById("nt-source").value = "manual";
+  resetSubmitBtn();
+}
+
+function resetSubmitBtn() {
+  const btn = document.getElementById("modal-submit-btn");
+  const text = document.getElementById("modal-submit-text");
+  if (btn) btn.disabled = false;
+  if (text) text.textContent = "Analyze with AI";
+}
+
+async function submitNewTicket() {
+  const title = document.getElementById("nt-title").value.trim();
+  const desc = document.getElementById("nt-desc").value.trim();
+
+  if (!title) {
+    document.getElementById("nt-title").focus();
+    document.getElementById("nt-title").style.borderColor =
+      "rgba(220,38,38,0.6)";
+    setTimeout(() => {
+      document.getElementById("nt-title").style.borderColor = "";
+    }, 2000);
+    return;
+  }
+
+  if (!desc) {
+    document.getElementById("nt-desc").focus();
+    document.getElementById("nt-desc").style.borderColor =
+      "rgba(220,38,38,0.6)";
+    setTimeout(() => {
+      document.getElementById("nt-desc").style.borderColor = "";
+    }, 2000);
+    return;
+  }
+
+  // Loading state
+  const btn = document.getElementById("modal-submit-btn");
+  const text = document.getElementById("modal-submit-text");
+  btn.disabled = true;
+  text.textContent = "Analyzing...";
+
+  const ticket = {
+    id: `MAN-${Date.now()}`,
+    source: document.getElementById("nt-source").value,
+    title,
+    description: desc,
+    priority: document.getElementById("nt-priority").value,
+    user_email:
+      document.getElementById("nt-email").value.trim() ||
+      "dashboard@resolveai.com",
+    created_at: new Date().toISOString(),
+  };
+
+  try {
+    // 1 — Save ticket to Firebase
+    await fetch(`${FIREBASE_URL}/tickets/${ticket.id}.json`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...ticket,
+        status: "received",
+        updated_at: new Date().toISOString(),
+      }),
+    });
+
+    text.textContent = "Running AI analysis...";
+
+    // 2 — Analyze with Groq directly from frontend
+    const analysis = await analyzeTicketFrontend(ticket);
+
+    // 3 — Save analysis to Firebase
+    await fetch(`${FIREBASE_URL}/analyses/${ticket.id}.json`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...analysis,
+        ticket_id: ticket.id,
+        created_at: new Date().toISOString(),
+      }),
+    });
+
+    // 4 — Update status
+    const newStatus = analysis.escalate ? "escalated" : "resolved";
+    await fetch(`${FIREBASE_URL}/tickets/${ticket.id}.json`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      }),
+    });
+
+    addActivity("blue", `New ticket created via dashboard`, ticket.title);
+    showToast(
+      `✅ Ticket analyzed — ${analysis.escalate ? "escalated" : "auto-resolved"}`,
+    );
+    closeNewTicket();
+    await loadAllTickets();
+
+    // Select the new ticket automatically
+    setTimeout(() => selectTicket(ticket.id), 500);
+  } catch (e) {
+    console.error("Submit error:", e);
+    showToast("⚠️ Error creating ticket — check console");
+    resetSubmitBtn();
+  }
+}
+
+async function analyzeTicketFrontend(ticket) {
+  const SYSTEM = `You are an expert IT support agent. Analyze tickets and respond ONLY with valid JSON:
+{
+  "summary": "one line summary",
+  "category": "hardware|software|network|access|other",
+  "severity": "low|medium|high|critical",
+  "root_cause": "probable root cause",
+  "fix_script": "executable powershell or bash script, or null",
+  "fix_instructions": "manual steps if no script",
+  "escalate": false,
+  "escalate_reason": null,
+  "estimated_time_minutes": 15
+}
+Return ONLY the JSON object, no extra text.`;
+
+  const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.2,
+      max_tokens: 600,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: SYSTEM },
+        {
+          role: "user",
+          content: `Analyze this IT ticket:\nTitle: ${ticket.title}\nDescription: ${ticket.description}\nPriority: ${ticket.priority}`,
+        },
+      ],
+    }),
+  });
+
+  const data = await resp.json();
+  return JSON.parse(data.choices[0].message.content);
+}
