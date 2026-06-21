@@ -1,419 +1,395 @@
-// ── Login Canvas Animation — Real-time Ticket Graph ───────────────────────────
+// ── ResolveAI Premium Login Animation ────────────────────────────────────────
 (function () {
   const canvas = document.getElementById("login-canvas");
   if (!canvas) return;
 
   const ctx = canvas.getContext("2d");
-  let W, H, bars, line, particles, frame;
+  let W,
+    H,
+    frame = 0;
+  let particles = [],
+    nodes = [],
+    codeLines = [];
+  let mouse = { x: -999, y: -999 };
 
-  // ── Colors ──────────────────────────────────────────────────────────────────
-  const C = {
-    accent: "#3b82f6",
-    purple: "#7c3aed",
-    teal: "#0d9488",
-    green: "#16a34a",
-    amber: "#d97706",
-    red: "#dc2626",
-    text: "rgba(226,234,247,0.6)",
-    grid: "rgba(30,42,63,0.8)",
-    bg: "rgba(8,12,20,0)",
-  };
+  const COLORS = ["#3b82f6", "#7c3aed", "#0d9488", "#06b6d4", "#10b981"];
 
-  // ── Resize ───────────────────────────────────────────────────────────────────
+  // ── Resize ──────────────────────────────────────────────────────────────────
   function resize() {
     W = canvas.width = canvas.offsetWidth;
     H = canvas.height = canvas.offsetHeight;
     init();
   }
 
-  // ── Init data ────────────────────────────────────────────────────────────────
+  // ── Init ────────────────────────────────────────────────────────────────────
   function init() {
-    // Bar chart data — simulates ticket volume per hour
-    const categories = ["Network", "Software", "Hardware", "Access", "Other"];
-    bars = categories.map((cat, i) => ({
-      label: cat,
-      value: 0.2 + Math.random() * 0.7,
-      target: 0.2 + Math.random() * 0.7,
-      color: [C.accent, C.purple, C.teal, C.amber, C.green][i],
-      x: 0,
-      y: 0,
-      w: 0,
-      h: 0,
-    }));
-
-    // Line chart — ticket resolution rate over time
-    line = {
-      points: Array.from({ length: 30 }, (_, i) => ({
-        x: i,
-        y: 0.3 + Math.sin(i * 0.4) * 0.2 + Math.random() * 0.15,
-      })),
-      color: C.accent,
-    };
-
-    // Floating particles — represent active tickets
-    particles = Array.from({ length: 18 }, () => ({
+    particles = Array.from({ length: 55 }, () => ({
       x: Math.random() * W,
       y: Math.random() * H,
-      r: 1.5 + Math.random() * 2.5,
+      r: Math.random() * 2 + 0.5,
       vx: (Math.random() - 0.5) * 0.4,
       vy: (Math.random() - 0.5) * 0.4,
-      color: [C.accent, C.purple, C.teal, C.green, C.amber][
-        Math.floor(Math.random() * 5)
-      ],
-      alpha: 0.3 + Math.random() * 0.5,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      alpha: Math.random() * 0.5 + 0.15,
+      pulse: Math.random() * Math.PI * 2,
+    }));
+
+    nodes = Array.from({ length: 10 }, () => ({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: Math.random() * 4 + 3,
+      vx: (Math.random() - 0.5) * 0.25,
+      vy: (Math.random() - 0.5) * 0.25,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      alpha: 0,
+      targetAlpha: Math.random() * 0.7 + 0.3,
+      pulse: Math.random() * Math.PI * 2,
+    }));
+
+    codeLines = Array.from({ length: 8 }, (_, i) => ({
+      x: (W / 8) * i + Math.random() * (W / 8),
+      y: Math.random() * H,
+      speed: Math.random() * 1.2 + 0.4,
+      chars: randomChars(),
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      alpha: Math.random() * 0.12 + 0.04,
     }));
   }
 
-  // ── Update ───────────────────────────────────────────────────────────────────
-  function update() {
-    // Animate bar values toward targets
-    bars.forEach((b) => {
-      b.value += (b.target - b.value) * 0.03;
-      if (Math.abs(b.value - b.target) < 0.01) {
-        b.target = 0.15 + Math.random() * 0.75;
-      }
-    });
+  function randomChars() {
+    return Array.from({ length: Math.floor(Math.random() * 7) + 4 }, () =>
+      String.fromCharCode(33 + Math.floor(Math.random() * 93)),
+    );
+  }
 
-    // Shift line chart left and add new point
-    if (frame % 40 === 0) {
-      line.points.shift();
-      const last = line.points[line.points.length - 1];
-      line.points.push({
-        x: last.x + 1,
-        y: Math.max(
-          0.05,
-          Math.min(0.95, last.y + (Math.random() - 0.48) * 0.12),
-        ),
-      });
-    }
+  // ── Mouse ────────────────────────────────────────────────────────────────────
+  canvas.addEventListener("mousemove", (e) => {
+    const r = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - r.left;
+    mouse.y = e.clientY - r.top;
+  });
 
-    // Move particles
-    particles.forEach((p) => {
-      p.x += p.vx;
-      p.y += p.vy;
-      if (p.x < 0 || p.x > W) p.vx *= -1;
-      if (p.y < 0 || p.y > H) p.vy *= -1;
-      p.alpha = 0.2 + Math.sin(frame * 0.02 + p.x) * 0.15;
+  canvas.addEventListener("mouseleave", () => {
+    mouse.x = -999;
+    mouse.y = -999;
+  });
+
+  // ── Draw Aurora ──────────────────────────────────────────────────────────────
+  function drawAurora() {
+    const t = frame * 0.007;
+
+    const blobs = [
+      {
+        cx: 0.25 + Math.sin(t) * 0.15,
+        cy: 0.3 + Math.cos(t * 0.8) * 0.15,
+        color: "59,130,246",
+        a: 0.055,
+      },
+      {
+        cx: 0.75 + Math.cos(t * 0.9) * 0.12,
+        cy: 0.65 + Math.sin(t * 0.6) * 0.15,
+        color: "124,58,237",
+        a: 0.045,
+      },
+      {
+        cx: 0.5 + Math.sin(t * 1.1) * 0.1,
+        cy: 0.15 + Math.cos(t * 1.3) * 0.1,
+        color: "13,148,136",
+        a: 0.035,
+      },
+      {
+        cx: 0.15 + Math.cos(t * 0.7) * 0.1,
+        cy: 0.8 + Math.sin(t * 0.9) * 0.1,
+        color: "6,182,212",
+        a: 0.03,
+      },
+    ];
+
+    blobs.forEach((b) => {
+      const g = ctx.createRadialGradient(
+        W * b.cx,
+        H * b.cy,
+        0,
+        W * b.cx,
+        H * b.cy,
+        W * 0.55,
+      );
+      g.addColorStop(0, `rgba(${b.color},${b.a})`);
+      g.addColorStop(0.5, `rgba(${b.color},${b.a * 0.4})`);
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
     });
   }
 
-  // ── Draw ─────────────────────────────────────────────────────────────────────
-  function draw() {
-    ctx.clearRect(0, 0, W, H);
-
-    drawGrid();
-    drawParticles();
-    drawBarChart();
-    drawLineChart();
-    drawLabels();
-    drawStatusDots();
-  }
-
+  // ── Draw Grid ────────────────────────────────────────────────────────────────
   function drawGrid() {
-    ctx.strokeStyle = C.grid;
+    ctx.strokeStyle = "rgba(30,42,63,0.45)";
     ctx.lineWidth = 0.5;
+    const s = 48;
 
-    const cols = 8,
-      rows = 6;
-    for (let i = 0; i <= cols; i++) {
-      const x = (W / cols) * i;
+    for (let x = 0; x < W; x += s) {
+      ctx.globalAlpha = 0.35;
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, H);
       ctx.stroke();
     }
-    for (let i = 0; i <= rows; i++) {
-      const y = (H / rows) * i;
+    for (let y = 0; y < H; y += s) {
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(W, y);
       ctx.stroke();
     }
+    ctx.globalAlpha = 1;
   }
 
+  // ── Draw Code Rain ───────────────────────────────────────────────────────────
+  function drawCodeRain() {
+    codeLines.forEach((line) => {
+      line.y += line.speed;
+      if (line.y > H + 120) {
+        line.y = -80;
+        line.chars = randomChars();
+      }
+      if (frame % 18 === 0) {
+        const i = Math.floor(Math.random() * line.chars.length);
+        line.chars[i] = String.fromCharCode(
+          33 + Math.floor(Math.random() * 93),
+        );
+      }
+
+      ctx.font = "11px JetBrains Mono, monospace";
+      line.chars.forEach((ch, i) => {
+        const a = Math.max(0, line.alpha - i * 0.012);
+        ctx.globalAlpha = a;
+        ctx.fillStyle = line.color;
+        ctx.fillText(ch, line.x, line.y - i * 15);
+      });
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Draw Particles ───────────────────────────────────────────────────────────
   function drawParticles() {
-    // Draw connections between nearby particles
-    particles.forEach((p, i) => {
-      particles.slice(i + 1).forEach((q) => {
-        const dist = Math.hypot(p.x - q.x, p.y - q.y);
-        if (dist < 80) {
+    particles.forEach((p) => {
+      const dx = p.x - mouse.x;
+      const dy = p.y - mouse.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 90 && dist > 0) {
+        p.vx += (dx / dist) * 0.25;
+        p.vy += (dy / dist) * 0.25;
+      }
+
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.98;
+      p.vy *= 0.98;
+      p.pulse += 0.035;
+
+      if (p.x < 0 || p.x > W) p.vx *= -1;
+      if (p.y < 0 || p.y > H) p.vy *= -1;
+
+      const a = p.alpha * (0.65 + Math.sin(p.pulse) * 0.35);
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = a;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    });
+  }
+
+  // ── Draw Network ─────────────────────────────────────────────────────────────
+  function drawNetwork() {
+    nodes.forEach((n) => {
+      n.x += n.vx;
+      n.y += n.vy;
+      n.pulse += 0.018;
+      n.alpha = Math.min(n.alpha + 0.008, n.targetAlpha);
+      if (n.x < 0 || n.x > W) n.vx *= -1;
+      if (n.y < 0 || n.y > H) n.vy *= -1;
+    });
+
+    // Connections
+    nodes.forEach((a, i) => {
+      nodes.slice(i + 1).forEach((b, j) => {
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        if (dist > 200) return;
+        const alpha = (1 - dist / 200) * 0.22;
+
+        ctx.save();
+        ctx.setLineDash([4, 9]);
+        ctx.lineDashOffset = -(frame * 0.4);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+        g.addColorStop(
+          0,
+          a.color +
+            Math.round(alpha * 255)
+              .toString(16)
+              .padStart(2, "0"),
+        );
+        g.addColorStop(
+          1,
+          b.color +
+            Math.round(alpha * 255)
+              .toString(16)
+              .padStart(2, "0"),
+        );
+        ctx.strokeStyle = g;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+        ctx.restore();
+
+        // Data packet
+        const pk = (frame + i * 17 + j * 31) % 90;
+        if (pk < 90) {
+          const t = pk / 90;
+          const px = a.x + (b.x - a.x) * t;
+          const py = a.y + (b.y - a.y) * t;
           ctx.beginPath();
-          ctx.strokeStyle = `rgba(59,130,246,${0.08 * (1 - dist / 80)})`;
-          ctx.lineWidth = 0.5;
-          ctx.moveTo(p.x, p.y);
-          ctx.lineTo(q.x, q.y);
-          ctx.stroke();
+          ctx.arc(px, py, 2, 0, Math.PI * 2);
+          ctx.fillStyle = a.color;
+          ctx.globalAlpha = 0.7 * alpha * 4;
+          ctx.shadowColor = a.color;
+          ctx.shadowBlur = 6;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.globalAlpha = 1;
         }
       });
     });
 
-    particles.forEach((p) => {
+    // Nodes
+    nodes.forEach((n) => {
+      const pulse = Math.sin(n.pulse) * 3;
+
+      // Ring
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle =
-        p.color +
-        Math.round(p.alpha * 255)
-          .toString(16)
-          .padStart(2, "0");
-      ctx.fill();
-    });
-  }
-
-  function drawBarChart() {
-    const chartW = W * 0.38;
-    const chartH = H * 0.28;
-    const chartX = W * 0.08;
-    const chartY = H * 0.58;
-    const barW = (chartW / bars.length) * 0.6;
-    const gap = chartW / bars.length;
-
-    // Chart background
-    ctx.fillStyle = "rgba(15,22,35,0.6)";
-    ctx.beginPath();
-    ctx.roundRect(chartX - 12, chartY - 20, chartW + 24, chartH + 36, 8);
-    ctx.fill();
-
-    // Title
-    ctx.fillStyle = C.text;
-    ctx.font = `500 10px Inter, sans-serif`;
-    ctx.fillText("TICKETS BY CATEGORY", chartX, chartY - 8);
-
-    bars.forEach((b, i) => {
-      const x = chartX + i * gap + (gap - barW) / 2;
-      const h = chartH * b.value;
-      const y = chartY + chartH - h;
-
-      // Bar background
-      ctx.fillStyle = "rgba(255,255,255,0.04)";
-      ctx.beginPath();
-      ctx.roundRect(x, chartY, barW, chartH, 3);
-      ctx.fill();
-
-      // Bar fill with gradient
-      const grad = ctx.createLinearGradient(x, y, x, y + h);
-      grad.addColorStop(0, b.color + "cc");
-      grad.addColorStop(1, b.color + "33");
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.roundRect(x, y, barW, h, 3);
-      ctx.fill();
+      ctx.arc(n.x, n.y, n.r + pulse + 5, 0, Math.PI * 2);
+      ctx.strokeStyle = n.color;
+      ctx.lineWidth = 0.5;
+      ctx.globalAlpha = n.alpha * 0.25;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
 
       // Glow
-      ctx.shadowColor = b.color;
-      ctx.shadowBlur = 8;
-      ctx.fillStyle = b.color + "44";
+      const grd = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r + 10);
+      grd.addColorStop(0, n.color + "bb");
+      grd.addColorStop(1, n.color + "00");
       ctx.beginPath();
-      ctx.roundRect(x, y, barW, 3, 2);
+      ctx.arc(n.x, n.y, n.r + 10, 0, Math.PI * 2);
+      ctx.fillStyle = grd;
+      ctx.globalAlpha = n.alpha * 0.4;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // Core
+      ctx.shadowColor = n.color;
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      ctx.fillStyle = n.color;
+      ctx.globalAlpha = n.alpha;
       ctx.fill();
       ctx.shadowBlur = 0;
-
-      // Value
-      ctx.fillStyle = C.text;
-      ctx.font = `600 9px Inter, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.fillText(Math.round(b.value * 100), x + barW / 2, y - 4);
-
-      // Label
-      ctx.font = `400 8px Inter, sans-serif`;
-      ctx.fillStyle = "rgba(226,234,247,0.4)";
-      ctx.fillText(b.label.slice(0, 4), x + barW / 2, chartY + chartH + 12);
+      ctx.globalAlpha = 1;
     });
-
-    ctx.textAlign = "left";
   }
 
-  function drawLineChart() {
-    const chartW = W * 0.38;
-    const chartH = H * 0.22;
-    const chartX = W * 0.54;
-    const chartY = H * 0.58;
-
-    // Background
-    ctx.fillStyle = "rgba(15,22,35,0.6)";
-    ctx.beginPath();
-    ctx.roundRect(chartX - 12, chartY - 20, chartW + 24, chartH + 36, 8);
-    ctx.fill();
-
-    // Title
-    ctx.fillStyle = C.text;
-    ctx.font = `500 10px Inter, sans-serif`;
-    ctx.fillText("RESOLUTION RATE", chartX, chartY - 8);
-
-    if (line.points.length < 2) return;
-
-    const minX = line.points[0].x;
-    const maxX = line.points[line.points.length - 1].x;
-    const scaleX = (p) => chartX + ((p.x - minX) / (maxX - minX)) * chartW;
-    const scaleY = (p) => chartY + chartH - p.y * chartH;
-
-    // Area fill
-    const grad = ctx.createLinearGradient(0, chartY, 0, chartY + chartH);
-    grad.addColorStop(0, C.accent + "40");
-    grad.addColorStop(1, C.accent + "00");
-
-    ctx.beginPath();
-    ctx.moveTo(scaleX(line.points[0]), chartY + chartH);
-    line.points.forEach((p) => ctx.lineTo(scaleX(p), scaleY(p)));
-    ctx.lineTo(scaleX(line.points[line.points.length - 1]), chartY + chartH);
-    ctx.closePath();
-    ctx.fillStyle = grad;
-    ctx.fill();
-
-    // Line
-    ctx.beginPath();
-    ctx.moveTo(scaleX(line.points[0]), scaleY(line.points[0]));
-    line.points.forEach((p) => ctx.lineTo(scaleX(p), scaleY(p)));
-    ctx.strokeStyle = C.accent;
-    ctx.lineWidth = 2;
-    ctx.lineJoin = "round";
-    ctx.stroke();
-
-    // Last point dot
-    const last = line.points[line.points.length - 1];
-    ctx.beginPath();
-    ctx.arc(scaleX(last), scaleY(last), 4, 0, Math.PI * 2);
-    ctx.fillStyle = C.accent;
-    ctx.shadowColor = C.accent;
-    ctx.shadowBlur = 12;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-
-    // Current value
-    const pct = Math.round(last.y * 100);
-    ctx.fillStyle = "#86efac";
-    ctx.font = `700 13px Inter, sans-serif`;
-    ctx.fillText(`${pct}%`, chartX + chartW - 28, chartY - 8);
-  }
-
+  // ── Draw Labels ──────────────────────────────────────────────────────────────
   function drawLabels() {
-    // Top metrics row
-    const metrics = [
-      {
-        label: "Active",
-        value: Math.floor(12 + Math.sin(frame * 0.02) * 3),
-        color: C.accent,
-      },
-      {
-        label: "Resolved",
-        value: Math.floor(48 + Math.sin(frame * 0.015) * 5),
-        color: "#86efac",
-      },
-      {
-        label: "Escalated",
-        value: Math.floor(3 + Math.sin(frame * 0.03) * 1),
-        color: C.amber,
-      },
-      {
-        label: "Critical",
-        value: Math.floor(1 + Math.abs(Math.sin(frame * 0.04))),
-        color: "#fca5a5",
-      },
+    const labels = [
+      { text: "UiPath Maestro", x: W * 0.08, y: H * 0.1 },
+      { text: "Groq AI ⚡", x: W * 0.58, y: H * 0.16 },
+      { text: "Firebase RT", x: W * 0.06, y: H * 0.84 },
+      { text: "ServiceNow", x: W * 0.55, y: H * 0.8 },
+      { text: "Slack API", x: W * 0.72, y: H * 0.46 },
+      { text: "✓ Auto-resolve", x: W * 0.04, y: H * 0.52 },
     ];
 
-    const metW = W * 0.18;
-    const metY = H * 0.08;
-    const startX = W * 0.08;
+    ctx.font = "10px Inter, sans-serif";
+    labels.forEach((l, i) => {
+      const t = frame * 0.007 + i * 1.1;
+      const y = l.y + Math.sin(t) * 5;
+      const a = 0.2 + Math.sin(t * 0.6) * 0.08;
+      const tw = ctx.measureText(l.text).width;
+      const col = COLORS[i % COLORS.length];
 
-    metrics.forEach((m, i) => {
-      const x = startX + i * (metW + 8);
-
-      ctx.fillStyle = "rgba(15,22,35,0.7)";
+      ctx.globalAlpha = a;
+      ctx.fillStyle = "rgba(8,12,20,0.75)";
       ctx.beginPath();
-      ctx.roundRect(x, metY, metW, 46, 6);
+      ctx.roundRect(l.x - 7, y - 13, tw + 14, 20, 5);
       ctx.fill();
 
-      ctx.strokeStyle = m.color + "44";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(x, metY, metW, 46, 6);
+      ctx.strokeStyle = col + "55";
+      ctx.lineWidth = 0.8;
       ctx.stroke();
 
-      ctx.fillStyle = m.color;
-      ctx.font = `700 18px Inter, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.fillText(m.value, x + metW / 2, metY + 26);
-
-      ctx.fillStyle = "rgba(226,234,247,0.4)";
-      ctx.font = `400 9px Inter, sans-serif`;
-      ctx.fillText(m.label.toUpperCase(), x + metW / 2, metY + 40);
+      ctx.fillStyle = col;
+      ctx.globalAlpha = a * 1.8;
+      ctx.fillText(l.text, l.x, y);
+      ctx.globalAlpha = 1;
     });
-
-    ctx.textAlign = "left";
   }
 
-  function drawStatusDots() {
-    // Animated status feed on the right side
-    const feedX = W * 0.54;
-    const feedY = H * 0.1;
-    const feedW = W * 0.38;
+  // ── Scan line ────────────────────────────────────────────────────────────────
+  function drawScanLine() {
+    const y = (frame * 1.0) % H;
+    const g = ctx.createLinearGradient(0, y - 24, 0, y + 24);
+    g.addColorStop(0, "rgba(59,130,246,0)");
+    g.addColorStop(0.5, "rgba(59,130,246,0.035)");
+    g.addColorStop(1, "rgba(59,130,246,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, y - 24, W, 48);
+  }
 
-    ctx.fillStyle = "rgba(15,22,35,0.6)";
-    ctx.beginPath();
-    ctx.roundRect(feedX - 12, feedY - 8, feedW + 24, H * 0.42, 8);
-    ctx.fill();
+  // ── Corner brackets ──────────────────────────────────────────────────────────
+  function drawCorners() {
+    const s = 22;
+    const a = 0.5 + Math.sin(frame * 0.04) * 0.15;
+    const col = `rgba(59,130,246,${a})`;
 
-    ctx.fillStyle = C.text;
-    ctx.font = `500 10px Inter, sans-serif`;
-    ctx.fillText("LIVE ACTIVITY", feedX, feedY + 4);
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.5;
 
-    const events = [
-      { text: "VPN auth failure resolved", color: "#86efac", time: "0s ago" },
-      { text: "BSOD escalated → human", color: "#fca5a5", time: "12s ago" },
-      {
-        text: "Printer fix script deployed",
-        color: "#86efac",
-        time: "28s ago",
-      },
-      { text: "Groq analysis complete", color: C.accent, time: "41s ago" },
-      { text: "New ticket from Gmail", color: C.amber, time: "55s ago" },
-      { text: "Slack notification sent", color: C.purple, time: "1m ago" },
-      { text: "Jira issue #IT-291 created", color: C.teal, time: "2m ago" },
+    const corners = [
+      [0, 0, 1, 1],
+      [W, 0, -1, 1],
+      [0, H, 1, -1],
+      [W, H, -1, -1],
     ];
 
-    events.forEach((e, i) => {
-      const y = feedY + 22 + i * 26;
-      const opacity = 1 - i * 0.1;
-      const pulse = i === 0 ? Math.abs(Math.sin(frame * 0.08)) : 0;
-
-      // Dot
+    corners.forEach(([x, y, sx, sy]) => {
       ctx.beginPath();
-      ctx.arc(feedX + 5, y, 4 + pulse * 2, 0, Math.PI * 2);
-      ctx.fillStyle =
-        e.color +
-        Math.round((0.3 + pulse * 0.4) * 255)
-          .toString(16)
-          .padStart(2, "0");
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(feedX + 5, y, 3, 0, Math.PI * 2);
-      ctx.fillStyle = e.color;
-      ctx.fill();
-
-      // Text
-      ctx.fillStyle = `rgba(226,234,247,${opacity * 0.8})`;
-      ctx.font = `400 10px Inter, sans-serif`;
-      ctx.fillText(e.text, feedX + 16, y + 4);
-
-      // Time
-      ctx.fillStyle = `rgba(77,98,128,${opacity})`;
-      ctx.font = `400 9px Inter, sans-serif`;
-      ctx.textAlign = "right";
-      ctx.fillText(e.time, feedX + feedW, y + 4);
-      ctx.textAlign = "left";
+      ctx.moveTo(x + sx * s, y);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x, y + sy * s);
+      ctx.stroke();
     });
   }
 
-  // ── Loop ──────────────────────────────────────────────────────────────────────
-  frame = 0;
+  // ── Loop ─────────────────────────────────────────────────────────────────────
   function loop() {
+    ctx.clearRect(0, 0, W, H);
+    drawAurora();
+    drawGrid();
+    drawCodeRain();
+    drawParticles();
+    drawNetwork();
+    drawLabels();
+    drawScanLine();
+    drawCorners();
     frame++;
-    update();
-    draw();
     requestAnimationFrame(loop);
   }
 
-  // ── Start ─────────────────────────────────────────────────────────────────────
   window.addEventListener("resize", resize);
   resize();
   loop();
