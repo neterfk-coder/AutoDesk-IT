@@ -13,7 +13,7 @@ google-credentials*.json
 serviceAccountKey.json
 
 # ── Frontend secrets ───────────────────────────────────────────────────────────
-frontend/config.js
+# frontend/config.js
 !frontend/config.example.js
 
 # ── Python ────────────────────────────────────────────────────────────────────
