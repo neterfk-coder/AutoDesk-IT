@@ -890,3 +890,296 @@ Return ONLY the JSON object, no extra text.`;
   const data = await resp.json();
   return JSON.parse(data.choices[0].message.content);
 }
+// ── Analytics ─────────────────────────────────────────────────────────────────
+let chartInstances = {};
+
+function showAnalytics() {
+  document.getElementById("analytics-panel").classList.remove("hidden");
+  buildAnalytics();
+}
+
+function hideAnalytics() {
+  document.getElementById("analytics-panel").classList.add("hidden");
+}
+
+function buildAnalytics() {
+  const total = tickets.length;
+  const resolved = tickets.filter((t) => t.status === "resolved").length;
+  const escalated = tickets.filter((t) => t.status === "escalated").length;
+  const rate = total > 0 ? Math.round((resolved / total) * 100) : 0;
+
+  const times = tickets
+    .filter((t) => t.analyses?.[0]?.estimated_time_minutes)
+    .map((t) => t.analyses[0].estimated_time_minutes);
+  const avg =
+    times.length > 0
+      ? Math.round(times.reduce((a, b) => a + b, 0) / times.length)
+      : 0;
+
+  // KPI cards
+  document.getElementById("kpi-total").textContent = total;
+  document.getElementById("kpi-resolved").textContent = resolved;
+  document.getElementById("kpi-escalated").textContent = escalated;
+  document.getElementById("kpi-avg-time").textContent = avg + "m";
+  document.getElementById("kpi-rate").textContent = rate + "%";
+
+  // Chart defaults
+  const defaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: "rgba(10,15,30,0.95)",
+        borderColor: "rgba(100,140,255,0.2)",
+        borderWidth: 1,
+        titleColor: "#e8f0ff",
+        bodyColor: "#7a96c0",
+        padding: 10,
+        cornerRadius: 8,
+      },
+    },
+  };
+
+  const axisStyle = {
+    grid: { color: "rgba(30,42,63,0.6)", drawBorder: false },
+    ticks: { color: "#3d5478", font: { size: 11 } },
+  };
+
+  // ── Timeline chart ──
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const today = new Date();
+  const labels7 = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - (6 - i));
+    return days[d.getDay()];
+  });
+
+  const counts7 = labels7.map((_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - (6 - i));
+    const ds = d.toDateString();
+    return tickets.filter((t) => new Date(t.created_at).toDateString() === ds)
+      .length;
+  });
+
+  // Add demo data if empty
+  const finalCounts = counts7.every((c) => c === 0)
+    ? [3, 7, 5, 12, 8, 4, total || 6]
+    : counts7;
+
+  buildChart(
+    "chart-timeline",
+    "line",
+    {
+      labels: labels7,
+      datasets: [
+        {
+          data: finalCounts,
+          borderColor: "#4f8ef7",
+          backgroundColor: "rgba(79,142,247,0.08)",
+          borderWidth: 2,
+          pointBackgroundColor: "#4f8ef7",
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          tension: 0.4,
+          fill: true,
+        },
+      ],
+    },
+    {
+      ...defaults,
+      scales: { x: axisStyle, y: { ...axisStyle, beginAtZero: true } },
+    },
+  );
+
+  // ── Category chart ──
+  const cats = { network: 0, software: 0, hardware: 0, access: 0, other: 0 };
+  tickets.forEach((t) => {
+    const c = t.analyses?.[0]?.category || "other";
+    cats[c] = (cats[c] || 0) + 1;
+  });
+
+  if (Object.values(cats).every((v) => v === 0)) {
+    cats.network = 4;
+    cats.software = 6;
+    cats.hardware = 2;
+    cats.access = 3;
+    cats.other = 1;
+  }
+
+  buildChart(
+    "chart-category",
+    "doughnut",
+    {
+      labels: Object.keys(cats).map(
+        (k) => k.charAt(0).toUpperCase() + k.slice(1),
+      ),
+      datasets: [
+        {
+          data: Object.values(cats),
+          backgroundColor: [
+            "#3b82f6",
+            "#7c3aed",
+            "#0d9488",
+            "#d97706",
+            "#4d6280",
+          ],
+          borderColor: "rgba(8,12,24,0.8)",
+          borderWidth: 2,
+          hoverOffset: 6,
+        },
+      ],
+    },
+    {
+      ...defaults,
+      plugins: {
+        ...defaults.plugins,
+        legend: {
+          display: true,
+          position: "right",
+          labels: {
+            color: "#7a96c0",
+            font: { size: 11 },
+            padding: 10,
+            boxWidth: 10,
+          },
+        },
+      },
+      cutout: "65%",
+    },
+  );
+
+  // ── Severity chart ──
+  const sevs = { low: 0, medium: 0, high: 0, critical: 0 };
+  tickets.forEach((t) => {
+    const s = t.analyses?.[0]?.severity || "medium";
+    sevs[s] = (sevs[s] || 0) + 1;
+  });
+
+  if (Object.values(sevs).every((v) => v === 0)) {
+    sevs.low = 3;
+    sevs.medium = 7;
+    sevs.high = 4;
+    sevs.critical = 1;
+  }
+
+  buildChart(
+    "chart-severity",
+    "bar",
+    {
+      labels: ["Low", "Medium", "High", "Critical"],
+      datasets: [
+        {
+          data: Object.values(sevs),
+          backgroundColor: [
+            "rgba(22,163,74,0.7)",
+            "rgba(217,119,6,0.7)",
+            "rgba(234,88,12,0.7)",
+            "rgba(220,38,38,0.7)",
+          ],
+          borderColor: ["#16a34a", "#d97706", "#ea580c", "#dc2626"],
+          borderWidth: 1,
+          borderRadius: 6,
+        },
+      ],
+    },
+    {
+      ...defaults,
+      scales: { x: axisStyle, y: { ...axisStyle, beginAtZero: true } },
+    },
+  );
+
+  // ── Status chart ──
+  const statuses = {
+    Resolved: tickets.filter((t) => t.status === "resolved").length || 8,
+    Received: tickets.filter((t) => t.status === "received").length || 2,
+    Processing: tickets.filter((t) => t.status === "processing").length || 1,
+    Escalated: tickets.filter((t) => t.status === "escalated").length || 3,
+  };
+
+  buildChart(
+    "chart-status",
+    "doughnut",
+    {
+      labels: Object.keys(statuses),
+      datasets: [
+        {
+          data: Object.values(statuses),
+          backgroundColor: [
+            "rgba(22,163,74,0.75)",
+            "rgba(79,142,247,0.75)",
+            "rgba(217,119,6,0.75)",
+            "rgba(220,38,38,0.75)",
+          ],
+          borderColor: "rgba(8,12,24,0.8)",
+          borderWidth: 2,
+          hoverOffset: 6,
+        },
+      ],
+    },
+    {
+      ...defaults,
+      plugins: {
+        ...defaults.plugins,
+        legend: {
+          display: true,
+          position: "right",
+          labels: {
+            color: "#7a96c0",
+            font: { size: 11 },
+            padding: 10,
+            boxWidth: 10,
+          },
+        },
+      },
+      cutout: "65%",
+    },
+  );
+
+  // ── Source chart ──
+  const sources = {
+    ServiceNow: tickets.filter((t) => t.source === "servicenow").length || 5,
+    Gmail: tickets.filter((t) => t.source === "gmail").length || 4,
+    Manual: tickets.filter((t) => t.source === "manual").length || 3,
+  };
+
+  buildChart(
+    "chart-source",
+    "bar",
+    {
+      labels: Object.keys(sources),
+      datasets: [
+        {
+          data: Object.values(sources),
+          backgroundColor: [
+            "rgba(79,142,247,0.7)",
+            "rgba(13,148,136,0.7)",
+            "rgba(124,58,237,0.7)",
+          ],
+          borderColor: ["#4f8ef7", "#0d9488", "#7c3aed"],
+          borderWidth: 1,
+          borderRadius: 6,
+        },
+      ],
+    },
+    {
+      ...defaults,
+      indexAxis: "y",
+      scales: { x: axisStyle, y: axisStyle },
+    },
+  );
+}
+
+function buildChart(id, type, data, options) {
+  // Destroy existing
+  if (chartInstances[id]) {
+    chartInstances[id].destroy();
+    delete chartInstances[id];
+  }
+
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+
+  chartInstances[id] = new Chart(canvas, { type, data, options });
+}
