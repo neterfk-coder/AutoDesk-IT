@@ -1183,3 +1183,184 @@ function buildChart(id, type, data, options) {
 
   chartInstances[id] = new Chart(canvas, { type, data, options });
 }
+// ── Push Notifications ────────────────────────────────────────────────────────
+async function requestNotificationPermission() {
+  if (!("Notification" in window)) return false;
+  if (Notification.permission === "granted") return true;
+  if (Notification.permission === "denied") return false;
+  const permission = await Notification.requestPermission();
+  return permission === "granted";
+}
+
+function sendPushNotification(title, body, icon = "⚡") {
+  if (Notification.permission !== "granted") return;
+  const n = new Notification(title, {
+    body,
+    icon: "/favicon.ico",
+    badge: "/favicon.ico",
+    tag: "resolveai-alert",
+    requireInteraction: true,
+  });
+  n.onclick = () => {
+    window.focus();
+    n.close();
+  };
+  setTimeout(() => n.close(), 8000);
+}
+
+function checkCriticalTickets(tickets) {
+  tickets.forEach((t) => {
+    const isCritical = t.analyses?.[0]?.severity === "critical";
+    const isEscalated = t.status === "escalated";
+    const isNew = Date.now() - new Date(t.created_at).getTime() < 30000;
+
+    if ((isCritical || isEscalated) && isNew) {
+      sendPushNotification(
+        isEscalated
+          ? "🚨 Ticket escalated — Human required"
+          : "⚠️ Critical ticket detected",
+        t.title,
+      );
+    }
+  });
+}
+
+async function initNotifications() {
+  const granted = await requestNotificationPermission();
+  if (granted) {
+    showToast(
+      "🔔 Notifications enabled — you'll be alerted for critical tickets",
+    );
+  }
+}
+// ── Export PDF Report ─────────────────────────────────────────────────────────
+function exportPDF() {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const timeStr = now.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const total = tickets.length;
+  const resolved = tickets.filter((t) => t.status === "resolved").length;
+  const escalated = tickets.filter((t) => t.status === "escalated").length;
+  const rate = total > 0 ? Math.round((resolved / total) * 100) : 0;
+
+  const rows = tickets
+    .slice(0, 20)
+    .map(
+      (t) => `
+    <tr>
+      <td>${t.id?.slice(0, 12) || "N/A"}</td>
+      <td>${(t.title || "").slice(0, 45)}</td>
+      <td><span class="badge ${t.status}">${t.status || "unknown"}</span></td>
+      <td>${t.analyses?.[0]?.severity || "N/A"}</td>
+      <td>${t.source || "manual"}</td>
+      <td>${new Date(t.created_at).toLocaleDateString()}</td>
+    </tr>
+  `,
+    )
+    .join("");
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>ResolveAI Report</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background:#fff; color:#111; padding:32px; }
+  .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px; padding-bottom:18px; border-bottom:2px solid #3b82f6; }
+  .logo { display:flex; align-items:center; gap:10px; }
+  .logo-icon { width:40px; height:40px; background:linear-gradient(135deg,#3b82f6,#7c3aed); border-radius:10px; display:flex; align-items:center; justify-content:center; color:white; font-size:20px; }
+  .logo-name { font-size:22px; font-weight:800; color:#111; letter-spacing:-0.5px; }
+  .logo-sub  { font-size:11px; color:#666; }
+  .report-info { text-align:right; font-size:11px; color:#666; line-height:1.8; }
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
+  .kpi { background:#f8faff; border:1px solid #e2eaf7; border-radius:10px; padding:14px 16px; }
+  .kpi-val { font-size:28px; font-weight:800; color:#3b82f6; line-height:1; margin-bottom:4px; }
+  .kpi-lbl { font-size:10px; color:#666; text-transform:uppercase; letter-spacing:0.06em; }
+  .kpi.green .kpi-val { color:#16a34a; }
+  .kpi.red   .kpi-val { color:#dc2626; }
+  .kpi.amber .kpi-val { color:#d97706; }
+  h2 { font-size:14px; font-weight:700; color:#111; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid #e2eaf7; }
+  table { width:100%; border-collapse:collapse; font-size:11px; }
+  th { background:#3b82f6; color:white; padding:8px 10px; text-align:left; font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:0.05em; }
+  td { padding:7px 10px; border-bottom:1px solid #f0f4ff; color:#333; }
+  tr:nth-child(even) td { background:#f8faff; }
+  .badge { padding:2px 8px; border-radius:20px; font-size:10px; font-weight:600; text-transform:uppercase; }
+  .badge.resolved   { background:#dcfce7; color:#16a34a; }
+  .badge.escalated  { background:#fee2e2; color:#dc2626; }
+  .badge.received   { background:#dbeafe; color:#1d4ed8; }
+  .badge.processing { background:#fef3c7; color:#d97706; }
+  .footer { margin-top:24px; padding-top:14px; border-top:1px solid #e2eaf7; display:flex; justify-content:space-between; font-size:10px; color:#999; }
+  @media print { body { padding:16px; } }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <div>
+        <div class="logo-name">ResolveAI</div>
+        <div class="logo-sub">IT Support Command Center</div>
+      </div>
+    </div>
+    <div class="report-info">
+      <div><strong>Executive Report</strong></div>
+      <div>${dateStr} at ${timeStr}</div>
+      <div>Powered by Groq × UiPath Maestro</div>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="kpi-val">${total}</div>
+      <div class="kpi-lbl">Total Tickets</div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-val">${resolved}</div>
+      <div class="kpi-lbl">Auto-Resolved</div>
+    </div>
+    <div class="kpi red">
+      <div class="kpi-val">${escalated}</div>
+      <div class="kpi-lbl">Escalated</div>
+    </div>
+    <div class="kpi amber">
+      <div class="kpi-val">${rate}%</div>
+      <div class="kpi-lbl">Auto-resolve Rate</div>
+    </div>
+  </div>
+
+  <h2>Ticket Log — Last ${Math.min(total, 20)} tickets</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Title</th>
+        <th>Status</th>
+        <th>Severity</th>
+        <th>Source</th>
+        <th>Date</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+
+  <div class="footer">
+    <span>ResolveAI — UiPath AgentHack 2026</span>
+    <span>Generated automatically · auto-desk-it.vercel.app</span>
+  </div>
+</body>
+</html>`;
+
+  const win = window.open("", "_blank");
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => win.print(), 500);
+}

@@ -2643,3 +2643,51 @@ body {
     grid-column: 1;
   }
 }
+/* ── Notification button ── */
+.notif-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.notif-btn:hover {
+  background: rgba(79, 142, 247, 0.1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.notif-btn.active {
+  background: rgba(79, 142, 247, 0.12);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+/* ── Export button ── */
+.export-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.export-btn:hover {
+  background: rgba(22, 163, 74, 0.1);
+  border-color: var(--green);
+  color: var(--green-lt);
+}

@@ -12,11 +12,12 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <!-- ══ LOGIN SCREEN ══ -->
+    <!-- ══════════════════════════════════════════
+       LOGIN SCREEN
+  ══════════════════════════════════════════ -->
     <div id="login-screen" style="display: none">
       <canvas id="login-canvas"></canvas>
       <div class="login-container">
-        <!-- Left -->
         <div class="login-left">
           <div class="login-brand">
             <div class="login-brand-icon">
@@ -77,7 +78,6 @@
 
         <div class="login-divider-v"></div>
 
-        <!-- Right -->
         <div class="login-right">
           <div class="login-card">
             <div class="auth-tabs">
@@ -165,7 +165,7 @@
                     stroke="currentColor"
                     stroke-width="2"
                   >
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <rect x="3" y="11" width="18" height="11" rx="2" />
                     <path d="M7 11V7a5 5 0 0110 0v4" />
                   </svg>
                   <input
@@ -318,7 +318,7 @@
                     stroke="currentColor"
                     stroke-width="2"
                   >
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <rect x="3" y="11" width="18" height="11" rx="2" />
                     <path d="M7 11V7a5 5 0 0110 0v4" />
                   </svg>
                   <input
@@ -384,8 +384,11 @@
       </div>
     </div>
 
-    <!-- ══ APP ══ -->
+    <!-- ══════════════════════════════════════════
+       APP WRAPPER
+  ══════════════════════════════════════════ -->
     <div id="app-wrapper" style="display: none">
+      <!-- SIDEBAR -->
       <aside class="sidebar">
         <div class="sidebar-logo">
           <div class="logo-icon">
@@ -395,6 +398,7 @@
           </div>
           <span class="logo-text">ResolveAI</span>
         </div>
+
         <nav class="sidebar-nav">
           <div class="nav-label">WORKSPACE</div>
           <a class="nav-item active" onclick="setFilter('all', this)">
@@ -411,8 +415,7 @@
               <rect x="3" y="14" width="7" height="7" />
               <rect x="14" y="14" width="7" height="7" />
             </svg>
-            All Tickets
-            <span class="nav-badge" id="nav-all">0</span>
+            All Tickets <span class="nav-badge" id="nav-all">0</span>
           </a>
           <a class="nav-item" onclick="setFilter('received', this)">
             <svg
@@ -425,8 +428,7 @@
             >
               <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
             </svg>
-            Incoming
-            <span class="nav-badge" id="nav-received">0</span>
+            Incoming <span class="nav-badge" id="nav-received">0</span>
           </a>
           <a class="nav-item" onclick="setFilter('processing', this)">
             <svg
@@ -456,8 +458,7 @@
             >
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            Resolved
-            <span class="nav-badge success" id="nav-resolved">0</span>
+            Resolved <span class="nav-badge success" id="nav-resolved">0</span>
           </a>
           <a class="nav-item" onclick="setFilter('escalated', this)">
             <svg
@@ -474,9 +475,9 @@
               <line x1="12" y1="9" x2="12" y2="13" />
               <line x1="12" y1="17" x2="12.01" y2="17" />
             </svg>
-            Escalated
-            <span class="nav-badge danger" id="nav-escalated">0</span>
+            Escalated <span class="nav-badge danger" id="nav-escalated">0</span>
           </a>
+
           <div class="nav-label" style="margin-top: 24px">SOURCES</div>
           <a class="nav-item" onclick="setFilter('servicenow', this)">
             <svg
@@ -491,22 +492,6 @@
               <polyline points="14 2 14 8 20 8" />
             </svg>
             ServiceNow
-          </a>
-          <div class="nav-label" style="margin-top: 24px">ANALYTICS</div>
-          <a class="nav-item" onclick="showAnalytics()">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <line x1="18" y1="20" x2="18" y2="10" />
-              <line x1="12" y1="20" x2="12" y2="4" />
-              <line x1="6" y1="20" x2="6" y2="14" />
-            </svg>
-            Analytics
           </a>
           <a class="nav-item" onclick="setFilter('gmail', this)">
             <svg
@@ -538,7 +523,25 @@
             </svg>
             Manual
           </a>
+
+          <div class="nav-label" style="margin-top: 24px">ANALYTICS</div>
+          <a class="nav-item" onclick="showAnalytics()">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="18" y1="20" x2="18" y2="10" />
+              <line x1="12" y1="20" x2="12" y2="4" />
+              <line x1="6" y1="20" x2="6" y2="14" />
+            </svg>
+            Analytics
+          </a>
         </nav>
+
         <div class="user-profile">
           <img
             id="user-photo"
@@ -577,6 +580,7 @@
             </svg>
           </button>
         </div>
+
         <div class="sidebar-footer">
           <div class="live-indicator">
             <span class="pulse-dot"></span>
@@ -586,6 +590,7 @@
         </div>
       </aside>
 
+      <!-- MAIN CONTENT -->
       <div class="main-wrapper">
         <header class="topbar">
           <div class="topbar-left">
@@ -607,6 +612,51 @@
               <span class="metric-val" id="metric-avg">0m</span>
               <span class="metric-lbl">Avg resolution</span>
             </div>
+
+            <!-- Notifications button -->
+            <button
+              class="notif-btn"
+              id="notif-btn"
+              onclick="initNotifications()"
+              title="Enable push notifications"
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 01-3.46 0" />
+              </svg>
+            </button>
+
+            <!-- Export PDF button -->
+            <button
+              class="export-btn"
+              onclick="exportPDF()"
+              title="Export PDF report"
+            >
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path
+                  d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"
+                />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="12" y1="18" x2="12" y2="12" />
+                <line x1="9" y1="15" x2="15" y2="15" />
+              </svg>
+            </button>
+
+            <!-- New Ticket button -->
             <button class="new-ticket-btn" onclick="openNewTicket()">
               <svg
                 width="14"
@@ -621,6 +671,7 @@
               </svg>
               New Ticket
             </button>
+
             <button class="refresh-btn" onclick="loadAllTickets()">
               <svg
                 width="14"
@@ -764,6 +815,7 @@
           </section>
         </div>
       </div>
+      <!-- /.main-wrapper -->
 
       <!-- ══ NEW TICKET MODAL ══ -->
       <div
@@ -881,6 +933,191 @@
             </svg>
             <span id="modal-submit-text">Analyze with AI</span>
           </button>
+        </div>
+      </div>
+
+      <!-- ══ ANALYTICS FULL PAGE ══ -->
+      <div id="analytics-panel" class="analytics-overlay hidden">
+        <div class="analytics-page">
+          <div class="analytics-topbar">
+            <div>
+              <h2 class="analytics-title">Analytics Dashboard</h2>
+              <p class="analytics-sub">
+                Real-time KPIs from your IT support data
+              </p>
+            </div>
+            <button class="analytics-close" onclick="hideAnalytics()">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+              Close
+            </button>
+          </div>
+
+          <div class="kpi-row">
+            <div class="kpi-card">
+              <div
+                class="kpi-icon"
+                style="background: rgba(79, 142, 247, 0.1); color: #7fb3ff"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"
+                  />
+                  <polyline points="14 2 14 8 20 8" />
+                </svg>
+              </div>
+              <div class="kpi-val" id="kpi-total">0</div>
+              <div class="kpi-lbl">Total Tickets</div>
+            </div>
+            <div class="kpi-card">
+              <div
+                class="kpi-icon"
+                style="background: rgba(22, 163, 74, 0.1); color: #86efac"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </div>
+              <div class="kpi-val" id="kpi-resolved" style="color: #86efac">
+                0
+              </div>
+              <div class="kpi-lbl">Auto-Resolved</div>
+            </div>
+            <div class="kpi-card">
+              <div
+                class="kpi-icon"
+                style="background: rgba(220, 38, 38, 0.1); color: #fca5a5"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path
+                    d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                  />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
+              <div class="kpi-val" id="kpi-escalated" style="color: #fca5a5">
+                0
+              </div>
+              <div class="kpi-lbl">Escalated</div>
+            </div>
+            <div class="kpi-card">
+              <div
+                class="kpi-icon"
+                style="background: rgba(217, 119, 6, 0.1); color: #fcd34d"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              </div>
+              <div class="kpi-val" id="kpi-avg-time" style="color: #fcd34d">
+                0m
+              </div>
+              <div class="kpi-lbl">Avg Resolution</div>
+            </div>
+            <div class="kpi-card">
+              <div
+                class="kpi-icon"
+                style="background: rgba(13, 148, 136, 0.1); color: #5eead4"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+              </div>
+              <div class="kpi-val" id="kpi-rate" style="color: #5eead4">0%</div>
+              <div class="kpi-lbl">Auto-resolve Rate</div>
+            </div>
+          </div>
+
+          <div class="charts-grid">
+            <div class="chart-card wide">
+              <div class="chart-header">
+                <span class="chart-title">Tickets Over Time</span>
+                <span class="chart-sub">Last 7 days</span>
+              </div>
+              <div class="chart-wrap">
+                <canvas id="chart-timeline"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-header">
+                <span class="chart-title">By Category</span>
+                <span class="chart-sub">Distribution</span>
+              </div>
+              <div class="chart-wrap">
+                <canvas id="chart-category"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-header">
+                <span class="chart-title">By Severity</span>
+                <span class="chart-sub">Distribution</span>
+              </div>
+              <div class="chart-wrap">
+                <canvas id="chart-severity"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-header">
+                <span class="chart-title">Resolution Status</span>
+                <span class="chart-sub">All time</span>
+              </div>
+              <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-header">
+                <span class="chart-title">By Source</span>
+                <span class="chart-sub">Origin platform</span>
+              </div>
+              <div class="chart-wrap"><canvas id="chart-source"></canvas></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1019,9 +1256,10 @@
       </div>
     </div>
 
+    <!-- Scripts — order matters -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
     <script src="config.js"></script>
     <script src="auth.js"></script>
     <script src="login-animation.js"></script>
